@@ -64,18 +64,30 @@ python3 hot_ranks.py github     # GitHub Trending
 | **CSDN 热榜** | Jina Reader | 技术文章 + 浏览量 | ✅ 正常 |
 | **GitHub Trending** | Jina Reader + 代理 | 开源项目 + Star 数 | ✅ 需代理 |
 | **知乎热榜** | Jina Reader | 热门问题 | ✅ 正常 |
-| **抖音热榜** | 抖音 MCP | 热门视频 | ⚠️ 需 MCP |
+| **抖音热榜** | Jina Reader / Tavily | 热门视频 + 热度值 | ⚠️ 可能限流 |
 
 ---
 
 ## 🔧 高级配置
 
-### 配置微博 MCP（可选）
+### 配置 MCP 服务器（可选）
 
-微博 MCP 可以提供更准确的微博热搜数据。
+MCP 服务器可以提供更准确的数据，部分平台需要 MCP。
+
+#### 安装 mcporter
 
 ```bash
-# 检查微博 MCP 是否已安装
+# 使用 npm 安装
+npm install -g mcporter
+
+# 验证安装
+mcporter --version
+```
+
+#### 安装微博 MCP
+
+```bash
+# 检查是否已安装
 which mcp-server-weibo
 
 # 查看 MCP 服务器列表
@@ -84,7 +96,19 @@ mcporter list
 # 应该显示：weibo (10 tools)
 ```
 
-如果未安装，请参考：https://github.com/modelcontextprotocol/servers
+#### 安装抖音 MCP
+
+```bash
+# 检查是否已安装
+which mcp-server-douyin
+
+# 查看 MCP 服务器列表
+mcporter list
+
+# 应该显示：douyin (5 tools)
+```
+
+如果未安装 MCP 服务器，程序会自动使用备用方案（Jina Reader）。
 
 ### 配置 GitHub 代理（推荐）
 
@@ -282,19 +306,36 @@ ping www.bilibili.com
 git pull origin main
 ```
 
-### 知乎/抖音无法获取
+### 抖音无法获取
 
-**问题**: 显示"暂时无法获取"或"需要 MCP 服务器"
+**问题**: 显示"被限流"或"SecurityCompromiseError"
 
-**说明**: 
-- 知乎热榜由于反爬限制，可能偶尔无法获取
-- 抖音热榜需要安装抖音 MCP 服务器
+**原因**: 抖音反爬严格，Jina Reader 可能因访问频繁被临时限制
+
+**解决方案**:
+```bash
+# 1. 等待一段时间后重试（通常 1-2 小时）
+
+# 2. 使用 Tavily 备用方案（需要 API Key）
+export TAVILY_API_KEY=your_api_key
+python3 hot_ranks.py douyin
+
+# 3. 直接访问官网
+https://www.douyin.com/hot
+```
+
+**注意**: 抖音 MCP 服务器主要用于视频解析，不提供热榜功能。
+
+### 知乎无法获取
+
+**问题**: 显示"暂时无法获取"
+
+**说明**: 知乎热榜由于反爬限制，可能偶尔无法获取
 
 **解决方案**:
 ```bash
 # 直接访问官网
-# 知乎：https://www.zhihu.com/hot
-# 抖音：https://www.douyin.com/hot
+https://www.zhihu.com/hot
 ```
 
 ---

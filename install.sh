@@ -45,6 +45,22 @@ if command -v mcporter &> /dev/null; then
     echo ""
     echo "🔍 检查 MCP 服务器..."
     mcporter list 2>/dev/null || echo "⚠️  无法列出 MCP 服务器"
+    
+    echo ""
+    echo "🔍 检查微博 MCP..."
+    if command -v mcp-server-weibo &> /dev/null; then
+        echo "✅ 微博 MCP 已安装"
+    else
+        echo "⚠️  微博 MCP 未安装（可选）"
+    fi
+    
+    echo ""
+    echo "🔍 检查抖音 MCP..."
+    if command -v mcp-server-douyin &> /dev/null; then
+        echo "✅ 抖音 MCP 已安装"
+    else
+        echo "⚠️  抖音 MCP 未安装（可选）"
+    fi
 else
     echo "⚠️  mcporter 未安装（可选）"
     echo "💡 安装 mcporter 可以使用微博/抖音 MCP:"

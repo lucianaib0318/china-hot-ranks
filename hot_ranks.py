@@ -342,29 +342,66 @@ class HotRanksAggregator:
         print("💡 建议直接访问：https://www.zhihu.com/hot\n")
     
     def get_douyin(self):
-        """获取抖音热榜（备用方案）"""
+        """获取抖音热榜（Jina Reader + Tavily 备用方案）"""
         print("\n### 抖音热榜")
         print("网站：https://www.douyin.com/hot\n")
         
+        # 方案 1：使用 Jina Reader 读取抖音热榜页面
         try:
-            # 尝试使用抖音 MCP（如果可用）
             result = subprocess.run(
-                ['mcporter', 'call', 'douyin.get_trendings(limit: 10)'],
+                ['curl', '-s', '-A', 'Mozilla/5.0', 'https://r.jina.ai/http://www.douyin.com/hot'],
+                capture_output=True, text=True, timeout=45
+            )
+            
+            if result.stdout.strip() and 'SecurityCompromiseError' not in result.stdout:
+                lines = result.stdout.split('\n')
+                rank = 1
+                for line in lines:
+                    line = line.strip()
+                    # 匹配抖音热榜条目
+                    if line and len(line) > 5 and not line.startswith('http') and not line.startswith('Image'):
+                        if line.startswith('['):
+                            # 提取标题
+                            title_end = line.find('](')
+                            if title_end > 0:
+                                line = line[1:title_end]
+                        if line and len(line) > 3:
+                            print(f"{rank}. {line}")
+                            rank += 1
+                            if rank > 11:
+                                break
+                if rank > 2:
+                    return
+        except Exception as e:
+            pass
+        
+        # 方案 2：使用 Tavily 搜索抖音热榜
+        print("⚠️  Jina Reader 被限流，使用 Tavily 搜索...\n")
+        
+        try:
+            result = subprocess.run(
+                ['curl', '-s', '-X', 'POST', 'https://api.tavily.com/search',
+                 '-H', 'Content-Type: application/json',
+                 '-d', '{"api_key": "' + os.environ.get('TAVILY_API_KEY', '') + '", "query": "抖音热榜 2026", "search_depth": "basic", "max_results": 10}'],
                 capture_output=True, text=True, timeout=30
             )
             
             if result.returncode == 0 and result.stdout.strip():
                 data = json.loads(result.stdout)
-                if isinstance(data, list) and len(data) > 0:
-                    for i, item in enumerate(data[:10], 1):
-                        title = item.get('title', item.get('description', '无标题'))
+                results = data.get('results', [])
+                if results:
+                    for i, item in enumerate(results[:10], 1):
+                        title = item.get('title', '无标题')
+                        url = item.get('url', '')
                         print(f"{i}. {title}")
+                        if url:
+                            print(f"   {url}\n")
                     return
         except Exception:
             pass
         
-        # 备用方案：显示提示
-        print("⚠️  抖音热榜需要抖音 MCP 服务器")
+        # 都失败：显示提示
+        print("⚠️  抖音热榜暂时无法获取（可能因访问频繁被限流）")
         print("💡 建议直接访问：https://www.douyin.com/hot\n")
     
     def get_all(self):
