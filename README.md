@@ -70,11 +70,11 @@ python3 hot_ranks.py github     # GitHub Trending
 
 ## 🔧 高级配置
 
-### 配置 MCP 服务器（可选）
+### 配置 MCP 服务器（推荐）
 
-MCP 服务器可以提供更准确的数据，部分平台需要 MCP。
+MCP 服务器可以提供更准确、实时的数据。
 
-#### 安装 mcporter
+#### 1. 安装 mcporter
 
 ```bash
 # 使用 npm 安装
@@ -84,31 +84,51 @@ npm install -g mcporter
 mcporter --version
 ```
 
-#### 安装微博 MCP
+#### 2. 配置 MCP 服务器
 
 ```bash
-# 检查是否已安装
-which mcp-server-weibo
+# 创建配置目录
+mkdir -p ~/.mcporter
 
-# 查看 MCP 服务器列表
-mcporter list
+# 复制项目配置（如果已安装微博/抖音 MCP）
+cp /path/to/china-hot-ranks/config/mcporter.json ~/.mcporter/
 
-# 应该显示：weibo (10 tools)
+# 或者手动创建配置
+cat > ~/.mcporter/mcporter.json << 'EOF'
+{
+  "mcpServers": {
+    "weibo": {
+      "command": "mcp-server-weibo"
+    },
+    "douyin": {
+      "baseUrl": "http://localhost:18070/mcp"
+    }
+  }
+}
+EOF
 ```
 
-#### 安装抖音 MCP
+#### 3. 启动 MCP 服务器
 
 ```bash
-# 检查是否已安装
-which mcp-server-douyin
-
-# 查看 MCP 服务器列表
+# 查看已配置的服务器
 mcporter list
 
-# 应该显示：douyin (5 tools)
+# 应该显示：
+# - weibo (10 tools)
+# - douyin (5 tools)
 ```
 
-如果未安装 MCP 服务器，程序会自动使用备用方案（Jina Reader）。
+#### 4. 验证微博 MCP
+
+```bash
+# 测试微博热搜 API
+mcporter call "weibo.get_trendings(limit: 5)"
+
+# 应该返回 JSON 格式的微博热搜数据
+```
+
+如果未配置 MCP 服务器，程序会自动使用备用方案（Jina Reader），但可能遇到限流。
 
 ### 配置 GitHub 代理（推荐）
 
