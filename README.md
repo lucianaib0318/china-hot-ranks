@@ -14,6 +14,7 @@
 - 🚀 **一键获取** - 单命令获取所有平台热榜
 - 📝 **格式化输出** - 带链接、热度指数、播放量等详细信息
 - 🔧 **灵活选择** - 支持获取全部或指定平台
+- 🌐 **代理支持** - GitHub 等平台自动检测并使用代理
 - 📦 **开箱即用** - 无需 API Key，基于现有工具链
 
 ---
@@ -47,47 +48,15 @@ python3 hot_ranks.py github     # GitHub Trending
 
 ## 📊 支持平台
 
-| 平台 | 获取方式 | 数据内容 | 更新频率 |
-|-----|---------|---------|---------|
-| **微博热搜** | mcporter (weibo MCP) | 热搜话题 + 热度指数 | 实时 |
-| **B 站热门** | Jina Reader | 视频标题 + 播放量 | 实时 |
-| **百度热搜** | Jina Reader | 热搜话题 + 热度标记 | 实时 |
-| **CSDN 热榜** | Jina Reader | 技术文章 + 浏览量 | 小时级 |
-| **GitHub Trending** | GitHub MCP API | 开源项目 + Star 数 | 日级 |
-| **知乎热榜** | Tavily 搜索 | 热门问题 | 小时级 |
-| **抖音热榜** | Tavily 搜索 | 热门视频 | 实时 |
-
----
-
-## 📝 输出示例
-
-### 微博热搜
-```
-1. 习近平总书记的 2026 全国两会日历
-   https://m.weibo.cn/search?...
-
-2. 微信 朋友圈编辑 🔥113 万
-   https://m.weibo.cn/search?...
-
-3. 国产手机涨价 2000 元 🔥84 万
-   https://m.weibo.cn/search?...
-```
-
-### B 站热门
-```
-1. 当面一套，背后一套 - 小潮院长 175.5 万播放
-   http://www.bilibili.com/video/BV1BbwFznEpm
-
-2. 开拓者去欢愉打工然后丧失仅存的一丝梦想 - 觅 2 166 万播放
-   http://www.bilibili.com/video/BV1M5NFzrEKK
-```
-
-### GitHub Trending
-```
-1. freeCodeCamp/freeCodeCamp ⭐380,000
-   freeCodeCamp.org's open-source codebase and curriculum
-   https://github.com/freeCodeCamp/freeCodeCamp
-```
+| 平台 | 获取方式 | 数据内容 | 状态 |
+|-----|---------|---------|------|
+| **微博热搜** | 微博 MCP | 热搜话题 + 热度指数 | ⚠️ 需启动 MCP 服务器 |
+| **B 站热门** | Jina Reader | 视频标题 + 播放量 | ✅ 正常 |
+| **百度热搜** | Jina Reader | 热搜话题 + 热度标记 | ✅ 正常 |
+| **CSDN 热榜** | Jina Reader | 技术文章 + 浏览量 | ✅ 正常 |
+| **GitHub Trending** | Jina Reader + 代理 | 开源项目 + Star 数 | ✅ 需代理 |
+| **知乎热榜** | 备用方案 | 热门问题 | ⚠️ 模拟数据 |
+| **抖音热榜** | 备用方案 | 热门视频 | ⚠️ 模拟数据 |
 
 ---
 
@@ -96,11 +65,48 @@ python3 hot_ranks.py github     # GitHub Trending
 ### 必需
 - Python 3.6+
 - curl
-- mcporter
+- mcporter (可选，用于微博热搜)
 
 ### 可选（增强功能）
-- Tavily API Key（用于知乎/抖音热榜）
-- GitHub Token（用于 GitHub Trending）
+- HTTP 代理（用于 GitHub）
+- 微博 MCP 服务器 (`mcp-server-weibo`)
+
+---
+
+## 📝 输出示例
+
+### 微博热搜
+```
+### 微博热搜
+网站：https://s.weibo.com/top/sum
+
+1. 胖东来 169 元 1 克拉方糖戒指再上架 🔥77 万
+   https://m.weibo.cn/search?...
+
+2. 美宜佳被曝光后半小时无一人进店 🔥54 万
+   https://m.weibo.cn/search?...
+```
+
+### B 站热门
+```
+### B 站热门
+网站：http://www.bilibili.com/v/popular/rank/all
+
+1. 当面一套，背后一套 - 小潮院长 175.5 万播放
+   http://www.bilibili.com/video/BV1BbwFznEpm
+```
+
+### GitHub Trending
+```
+### GitHub Trending
+网站：https://github.com/trending
+
+🔑 使用代理：http://127.0.0.1:7890
+
+1. freeCodeCamp/freeCodeCamp ⭐380,000
+   freeCodeCamp.org's open-source codebase and curriculum
+   https://github.com/freeCodeCamp/freeCodeCamp
+```
 
 ---
 
@@ -174,19 +180,47 @@ all_data = aggregator.get_all()
 
 ## ⚠️ 注意事项
 
-1. **API 限制**
-   - 微博热搜：依赖 weibo MCP 服务
-   - GitHub：需要有效 Token
-   - 知乎/抖音：通过 Tavily 搜索，有调用限制
+1. **微博 MCP**
+   - 需要安装并启动 `mcp-server-weibo`
+   - 配置在 `/root/.openclaw/workspace/config/mcporter.json`
 
-2. **数据时效性**
+2. **GitHub 代理**
+   - 自动检测常见代理端口（7890、10808、8888）
+   - 可设置环境变量 `HTTPS_PROXY`
+
+3. **数据时效性**
    - 微博/B 站/抖音：实时更新
    - CSDN/知乎：小时级更新
    - GitHub：日级更新
 
-3. **网络要求**
+4. **网络要求**
    - 需要访问国内平台（微博、B 站等）
-   - GitHub 可能需要代理
+   - GitHub 需要代理
+
+---
+
+## 🔧 故障排查
+
+### 微博热搜失败
+```bash
+# 检查微博 MCP 服务器
+mcporter list
+
+# 应该显示 weibo (10 tools)
+```
+
+### GitHub 无法访问
+```bash
+# 设置代理
+export HTTPS_PROXY=http://127.0.0.1:7890
+
+# 或检查代理是否可用
+curl -x http://127.0.0.1:7890 https://www.google.com
+```
+
+### B 站解析失败
+- 可能是 Jina Reader 格式变化
+- 检查原始输出：`curl https://r.jina.ai/http://www.bilibili.com/v/popular/rank/all`
 
 ---
 
@@ -210,10 +244,9 @@ all_data = aggregator.get_all()
 
 ## 🙏 致谢
 
-- [weibo-mcp](https://github.com/ModelContextProtocol/servers) - 微博 MCP 服务
+- [微博 MCP](https://github.com/modelcontextprotocol/servers) - 微博数据源
 - [Jina AI](https://jina.ai/) - 网页读取服务
-- [GitHub MCP](https://github.com/modelcontextprotocol/servers) - GitHub MCP 服务
-- [Tavily](https://tavily.com/) - 搜索服务
+- [mcporter](https://github.com/modelcontextprotocol/mcporter) - MCP 运行时
 
 ---
 

@@ -32,16 +32,29 @@ class HotRanksAggregator:
         }
     
     def get_weibo(self):
-        """获取微博热搜"""
+        """获取微博热搜（使用微博 MCP）"""
+        print("\n### 微博热搜")
+        print("网站：https://s.weibo.com/top/sum\n")
+        
         try:
+            # 使用 mcporter 调用微博 MCP API
             result = subprocess.run(
                 ['mcporter', 'call', 'weibo.get_trendings(limit: 15)'],
-                capture_output=True, text=True, timeout=30
+                capture_output=True, text=True, timeout=60
             )
+            
+            if result.returncode != 0:
+                if result.stderr:
+                    print(f"⚠️  mcporter 错误：{result.stderr.strip()[:200]}")
+                print("💡 提示：请确保微博 MCP 服务器已启动")
+                return
+            
+            # 解析 JSON
             data = json.loads(result.stdout)
             
-            print("\n### 微博热搜")
-            print("网站：https://s.weibo.com/top/sum\n")
+            if not isinstance(data, list) or len(data) == 0:
+                print("⚠️  微博热搜数据为空")
+                return
             
             for i, item in enumerate(data[:10], 1):
                 title = item.get('description', '无标题')
@@ -51,37 +64,78 @@ class HotRanksAggregator:
                 print(f"{i}. {title}{hot_tag}")
                 print(f"   {url}\n")
                 
+        except subprocess.TimeoutExpired:
+            print("❌ 微博热搜获取超时（60 秒）")
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON 解析失败：{e}")
+            print(f"   原始输出：{result.stdout[:200]}")
         except Exception as e:
             print(f"❌ 微博热搜获取失败：{e}")
     
     def get_bilibili(self):
-        """获取 B 站热门"""
+        """获取 B 站热门（优化解析逻辑）"""
+        print("\n### B 站热门")
+        print("网站：http://www.bilibili.com/v/popular/rank/all\n")
+        
         try:
             result = subprocess.run(
-                ['curl', '-s', 'https://r.jina.ai/http://www.bilibili.com/v/popular/rank/all'],
+                ['curl', '-s', '-A', 'Mozilla/5.0', 'https://r.jina.ai/http://www.bilibili.com/v/popular/rank/all'],
                 capture_output=True, text=True, timeout=30
             )
             
-            print("\n### B 站热门")
-            print("网站：http://www.bilibili.com/v/popular/rank/all\n")
-            
-            # 解析视频列表
             lines = result.stdout.split('\n')
             videos = []
-            for line in lines:
-                if 'bilibili.com/video/BV' in line and '_1_' in line:
-                    videos.append(line)
             
-            for i, video in enumerate(videos[:10], 1):
-                # 提取标题和链接
-                if 'http://www.bilibili.com/video/' in video:
-                    parts = video.split('](')
-                    if len(parts) >= 2:
-                        title_part = parts[0].split('[')[-1]
-                        url = parts[1].split(')')[0]
-                        print(f"{i}. {title_part}")
-                        print(f"   {url}\n")
+            # 解析 Markdown 格式：[标题](链接) 播放量
+            for line in lines:
+                # 匹配格式：[视频标题](http://www.bilibili.com/video/BVxxx) xxx 万播放
+                if 'bilibili.com/video/' in line and line.strip().startswith('['):
+                    # 提取标题
+                    title_start = line.find('[') + 1
+                    title_end = line.find('](')
+                    if title_start > 0 and title_end > title_start:
+                        title = line[title_start:title_end]
                         
+                        # 提取链接
+                        url_start = title_end + 2
+                        url_end = line.find(')', url_start)
+                        if url_end > url_start:
+                            url = line[url_start:url_end]
+                            
+                            # 提取播放量（如果有）
+                            views = ''
+                            views_pos = line.find('播放', url_end)
+                            if views_pos > 0:
+                                views_start = line.rfind(' ', url_end, views_pos)
+                                if views_start > 0:
+                                    views = line[views_start:views_pos+2].strip()
+                            
+                            videos.append({
+                                'title': title,
+                                'url': url,
+                                'views': views
+                            })
+            
+            # 打印前 10 个视频
+            for i, video in enumerate(videos[:10], 1):
+                title = video['title']
+                url = video['url']
+                views = video['views']
+                
+                # 清理标题中的 Image 等无用信息
+                if 'Image' in title:
+                    continue
+                
+                print(f"{i}. {title}{views}")
+                print(f"   {url}\n")
+            
+            if not videos:
+                print("⚠️  未解析到视频，可能是格式变化")
+                print("原始输出前 500 字符:")
+                print(result.stdout[:500])
+                        
+        except subprocess.TimeoutExpired:
+            print("❌ B 站热门获取超时（30 秒）")
         except Exception as e:
             print(f"❌ B 站热门获取失败：{e}")
     
@@ -125,31 +179,113 @@ class HotRanksAggregator:
             print(f"❌ CSDN 热榜获取失败：{e}")
     
     def get_github(self):
-        """获取 GitHub Trending"""
+        """获取 GitHub Trending（带代理支持）"""
+        print("\n### GitHub Trending")
+        print("网站：https://github.com/trending\n")
+        
+        # 检测并使用代理
+        proxy = self._get_proxy_url()
+        curl_cmd = ['curl', '-s', '-A', 'Mozilla/5.0']
+        
+        if proxy:
+            curl_cmd.extend(['-x', proxy])
+            print(f"🔑 使用代理：{proxy}\n")
+        else:
+            print("⚠️  未检测到代理，GitHub 可能访问失败\n")
+        
         try:
-            result = subprocess.run(
-                ['mcporter', 'call', 'github.search_repositories(query: "stars:>50000 pushed:>=2026-03-10", page: 1, perPage: 10)'],
-                capture_output=True, text=True, timeout=30
-            )
-            data = json.loads(result.stdout)
+            curl_cmd.append('https://r.jina.ai/https://github.com/trending')
+            result = subprocess.run(curl_cmd, capture_output=True, text=True, timeout=60)
             
-            print("\n### GitHub Trending")
-            print("网站：https://github.com/trending\n")
+            if result.returncode != 0 or not result.stdout.strip():
+                print(f"❌ 请求失败：{result.stderr[:200] if result.stderr else '无响应'}")
+                return
             
-            for i, repo in enumerate(data.get('items', [])[:10], 1):
-                name = repo.get('name', 'Unknown')
-                full_name = repo.get('full_name', '')
-                url = repo.get('html_url', '')
-                desc = repo.get('description', '') or ''
-                stars = repo.get('stargazers_count', 0)
-                
-                print(f"{i}. {full_name} ⭐{stars:,}")
-                if desc:
-                    print(f"   {desc[:80]}")
-                print(f"   {url}\n")
-                
+            # 解析 Markdown 格式
+            lines = result.stdout.split('\n')
+            repos = []
+            
+            i = 0
+            while i < len(lines):
+                line = lines[i].strip()
+                # 匹配格式：[组织/项目名](链接)
+                if line.startswith('[') and '](' in line and 'github.com' in line:
+                    title_end = line.find('](')
+                    title = line[1:title_end]
+                    
+                    url_start = title_end + 2
+                    url_end = line.find(')', url_start)
+                    url = line[url_start:url_end] if url_end > url_start else ''
+                    
+                    # 查找描述和 star 数
+                    desc = ''
+                    stars = ''
+                    if i + 1 < len(lines):
+                        desc = lines[i + 1].strip()
+                    if i + 2 < len(lines):
+                        star_line = lines[i + 2]
+                        if 'star' in star_line.lower():
+                            # 提取 star 数
+                            import re
+                            star_match = re.search(r'[\d,]+', star_line)
+                            if star_match:
+                                stars = f" ⭐{star_match.group()}"
+                    
+                    if title and url:
+                        repos.append({
+                            'title': title,
+                            'url': url,
+                            'desc': desc,
+                            'stars': stars
+                        })
+                    i += 3
+                else:
+                    i += 1
+            
+            # 打印前 10 个项目
+            for i, repo in enumerate(repos[:10], 1):
+                print(f"{i}. {repo['title']}{repo['stars']}")
+                if repo['desc']:
+                    print(f"   {repo['desc'][:80]}")
+                print(f"   {repo['url']}\n")
+            
+            if not repos:
+                print("⚠️  未解析到项目，可能是格式变化或需要代理")
+                        
+        except subprocess.TimeoutExpired:
+            print("❌ GitHub Trending 获取超时（60 秒）")
         except Exception as e:
             print(f"❌ GitHub Trending 获取失败：{e}")
+    
+    def _get_proxy_url(self) -> str:
+        """获取代理 URL"""
+        import os
+        
+        # 检查环境变量
+        proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('HTTP_PROXY')
+        if proxy:
+            return proxy
+        
+        # 常用代理地址
+        common_proxies = [
+            'http://127.0.0.1:7890',  # Clash
+            'http://127.0.0.1:10808',  # v2ray
+            'http://127.0.0.1:8888',   # Charles
+        ]
+        
+        # 快速测试哪个代理可用
+        for p in common_proxies:
+            try:
+                result = subprocess.run(
+                    ['curl', '-s', '-x', p, '--connect-timeout', '2', '-o', '/dev/null', 'https://www.google.com'],
+                    capture_output=True, timeout=4
+                )
+                if result.returncode == 0:
+                    return p
+            except:
+                pass
+        
+        return ''
     
     def get_zhihu(self):
         """获取知乎热榜"""
