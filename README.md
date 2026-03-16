@@ -15,24 +15,31 @@
 - 📝 **格式化输出** - 带链接、热度指数、播放量等详细信息
 - 🔧 **灵活选择** - 支持获取全部或指定平台
 - 🌐 **代理支持** - GitHub 等平台自动检测并使用代理
+- 🔄 **备用方案** - 每个平台都有备用获取方式
 - 📦 **开箱即用** - 无需 API Key，基于现有工具链
 
 ---
 
 ## 🚀 快速开始
 
-### 安装
+### 1. 克隆项目
 
 ```bash
-# 克隆项目
 git clone https://github.com/lucianaib0318/china-hot-ranks.git
 cd china-hot-ranks
-
-# 无需额外依赖（使用系统工具）
-python3 hot_ranks.py --help
 ```
 
-### 使用
+### 2. 检查依赖
+
+```bash
+# 检查 Python 版本（需要 3.6+）
+python3 --version
+
+# 检查 curl 是否安装
+curl --version
+```
+
+### 3. 运行
 
 ```bash
 # 获取所有热榜
@@ -41,6 +48,7 @@ python3 hot_ranks.py
 # 获取指定平台
 python3 hot_ranks.py weibo      # 微博热搜
 python3 hot_ranks.py bilibili   # B 站热门
+python3 hot_ranks.py baidu      # 百度热搜
 python3 hot_ranks.py github     # GitHub Trending
 ```
 
@@ -50,26 +58,49 @@ python3 hot_ranks.py github     # GitHub Trending
 
 | 平台 | 获取方式 | 数据内容 | 状态 |
 |-----|---------|---------|------|
-| **微博热搜** | 微博 MCP | 热搜话题 + 热度指数 | ⚠️ 需启动 MCP 服务器 |
+| **微博热搜** | 微博 MCP / Jina Reader | 热搜话题 + 热度指数 | ✅ 正常 |
 | **B 站热门** | Jina Reader | 视频标题 + 播放量 | ✅ 正常 |
 | **百度热搜** | Jina Reader | 热搜话题 + 热度标记 | ✅ 正常 |
 | **CSDN 热榜** | Jina Reader | 技术文章 + 浏览量 | ✅ 正常 |
 | **GitHub Trending** | Jina Reader + 代理 | 开源项目 + Star 数 | ✅ 需代理 |
-| **知乎热榜** | 备用方案 | 热门问题 | ⚠️ 模拟数据 |
-| **抖音热榜** | 备用方案 | 热门视频 | ⚠️ 模拟数据 |
+| **知乎热榜** | Jina Reader | 热门问题 | ✅ 正常 |
+| **抖音热榜** | 抖音 MCP | 热门视频 | ⚠️ 需 MCP |
 
 ---
 
-## 🔧 依赖要求
+## 🔧 高级配置
 
-### 必需
-- Python 3.6+
-- curl
-- mcporter (可选，用于微博热搜)
+### 配置微博 MCP（可选）
 
-### 可选（增强功能）
-- HTTP 代理（用于 GitHub）
-- 微博 MCP 服务器 (`mcp-server-weibo`)
+微博 MCP 可以提供更准确的微博热搜数据。
+
+```bash
+# 检查微博 MCP 是否已安装
+which mcp-server-weibo
+
+# 查看 MCP 服务器列表
+mcporter list
+
+# 应该显示：weibo (10 tools)
+```
+
+如果未安装，请参考：https://github.com/modelcontextprotocol/servers
+
+### 配置 GitHub 代理（推荐）
+
+GitHub 在中国大陆访问可能需要代理。
+
+**方法 1：环境变量**
+```bash
+export HTTPS_PROXY=http://127.0.0.1:7890
+python3 hot_ranks.py github
+```
+
+**方法 2：自动检测**
+程序会自动检测常见代理端口：
+- `7890` (Clash)
+- `10808` (v2ray)
+- `8888` (Charles)
 
 ---
 
@@ -94,6 +125,9 @@ python3 hot_ranks.py github     # GitHub Trending
 
 1. 当面一套，背后一套 - 小潮院长 175.5 万播放
    http://www.bilibili.com/video/BV1BbwFznEpm
+
+2. 开拓者去欢愉打工然后丧失仅存的一丝梦想 166 万播放
+   http://www.bilibili.com/video/BV1M5NFzrEKK
 ```
 
 ### GitHub Trending
@@ -110,50 +144,60 @@ python3 hot_ranks.py github     # GitHub Trending
 
 ---
 
-## 📁 项目结构
-
-```
-china-hot-ranks/
-├── hot_ranks.py              # 主程序
-├── SKILL.md                  # Skill 文档
-├── README.md                 # 项目说明
-├── requirements.txt          # Python 依赖
-├── examples/
-│   └── output_sample.md      # 输出示例
-├── docs/
-│   └── api_reference.md      # API 参考
-└── LICENSE                   # MIT 许可证
-```
-
----
-
 ## 🛠️ 高级用法
 
 ### 导出为 Markdown
 
 ```bash
+# 导出今日热榜
 python3 hot_ranks.py > hot_ranks_$(date +%Y%m%d).md
+
+# 导出指定平台
+python3 hot_ranks.py weibo > weibo_$(date +%Y%m%d).md
 ```
 
 ### 定时获取（Cron Job）
 
 ```bash
+# 编辑 crontab
+crontab -e
+
 # 每天早上 9 点获取热榜
-0 9 * * * cd /path/to/china-hot-ranks && python3 hot_ranks.py >> hot_ranks.log
+0 9 * * * cd /path/to/china-hot-ranks && python3 hot_ranks.py >> hot_ranks.log 2>&1
+
+# 每小时获取一次微博热搜
+0 * * * * cd /path/to/china-hot-ranks && python3 hot_ranks.py weibo >> weibo.log 2>&1
 ```
 
-### 集成到工作流
+### 集成到 Python 项目
 
 ```python
 from hot_ranks import HotRanksAggregator
 
+# 创建聚合器
 aggregator = HotRanksAggregator()
 
 # 获取微博热搜
 weibo_data = aggregator.get_weibo()
 
+# 获取 B 站热门
+bilibili_data = aggregator.get_bilibili()
+
 # 获取所有热榜
 all_data = aggregator.get_all()
+```
+
+### 导出为 JSON
+
+```python
+import json
+from hot_ranks import HotRanksAggregator
+
+aggregator = HotRanksAggregator()
+
+# 获取数据后导出
+with open('hot_ranks.json', 'w', encoding='utf-8') as f:
+    json.dump(aggregator.get_all(), f, ensure_ascii=False, indent=2)
 ```
 
 ---
@@ -161,66 +205,115 @@ all_data = aggregator.get_all()
 ## 🎯 使用场景
 
 ### 内容创作者
-- 追踪热点话题，创作爆款内容
-- 了解平台趋势，优化选题方向
+- 📈 追踪热点话题，创作爆款内容
+- 🎯 了解平台趋势，优化选题方向
+- ⏰ 定时监控，抓住最佳发布时间
 
 ### 市场营销
-- 监控品牌提及和舆情
-- 发现热门话题，借势营销
+- 📊 监控品牌提及和舆情
+- 🔥 发现热门话题，借势营销
+- 📉 分析竞品动态
 
 ### 开发者
-- 关注技术趋势和开源项目
-- 学习热门技术栈
+- 💻 关注技术趋势和开源项目
+- 📚 学习热门技术栈
+- 🔍 发现优质开源项目
 
 ### 研究人员
-- 分析社交媒体趋势
-- 研究用户行为和兴趣
+- 📈 分析社交媒体趋势
+- 👥 研究用户行为和兴趣
+- 📊 数据采集与分析
 
 ---
 
-## ⚠️ 注意事项
-
-1. **微博 MCP**
-   - 需要安装并启动 `mcp-server-weibo`
-   - 配置在 `/root/.openclaw/workspace/config/mcporter.json`
-
-2. **GitHub 代理**
-   - 自动检测常见代理端口（7890、10808、8888）
-   - 可设置环境变量 `HTTPS_PROXY`
-
-3. **数据时效性**
-   - 微博/B 站/抖音：实时更新
-   - CSDN/知乎：小时级更新
-   - GitHub：日级更新
-
-4. **网络要求**
-   - 需要访问国内平台（微博、B 站等）
-   - GitHub 需要代理
-
----
-
-## 🔧 故障排查
+## ⚠️ 故障排查
 
 ### 微博热搜失败
+
+**问题**: 显示"微博 MCP 不可用"
+
+**解决方案**:
 ```bash
-# 检查微博 MCP 服务器
+# 1. 检查微博 MCP 是否安装
+which mcp-server-weibo
+
+# 2. 查看 MCP 服务器列表
 mcporter list
 
-# 应该显示 weibo (10 tools)
+# 3. 如果未显示 weibo，需要安装
+# 参考：https://github.com/modelcontextprotocol/servers
+
+# 4. 使用备用方案（自动）
+# 程序会自动切换到 Jina Reader 备用方案
 ```
 
 ### GitHub 无法访问
-```bash
-# 设置代理
-export HTTPS_PROXY=http://127.0.0.1:7890
 
-# 或检查代理是否可用
+**问题**: 请求超时或无响应
+
+**解决方案**:
+```bash
+# 方法 1：设置代理
+export HTTPS_PROXY=http://127.0.0.1:7890
+python3 hot_ranks.py github
+
+# 方法 2：测试代理是否可用
 curl -x http://127.0.0.1:7890 https://www.google.com
+
+# 方法 3：检查常见代理端口
+lsof -i :7890  # Clash
+lsof -i :10808 # v2ray
+lsof -i :8888  # Charles
 ```
 
 ### B 站解析失败
-- 可能是 Jina Reader 格式变化
-- 检查原始输出：`curl https://r.jina.ai/http://www.bilibili.com/v/popular/rank/all`
+
+**问题**: 显示"未解析到视频"
+
+**解决方案**:
+```bash
+# 1. 手动测试 Jina Reader
+curl -s 'https://r.jina.ai/http://www.bilibili.com/v/popular/rank/all' | head -50
+
+# 2. 检查网络连接
+ping www.bilibili.com
+
+# 3. 更新程序到最新版本
+git pull origin main
+```
+
+### 知乎/抖音无法获取
+
+**问题**: 显示"暂时无法获取"或"需要 MCP 服务器"
+
+**说明**: 
+- 知乎热榜由于反爬限制，可能偶尔无法获取
+- 抖音热榜需要安装抖音 MCP 服务器
+
+**解决方案**:
+```bash
+# 直接访问官网
+# 知乎：https://www.zhihu.com/hot
+# 抖音：https://www.douyin.com/hot
+```
+
+---
+
+## 📁 项目结构
+
+```
+china-hot-ranks/
+├── hot_ranks.py              # 主程序（热榜聚合器）
+├── SKILL.md                  # OpenClaw Skill 定义
+├── README.md                 # 项目说明（本文件）
+├── README_CN.md              # 中文文档
+├── requirements.txt          # Python 依赖
+├── examples/                 # 使用示例
+│   └── output_sample.md      # 输出示例
+├── docs/                     # 文档
+│   └── api_reference.md      # API 参考
+└── LICENSE                   # MIT 许可证
+```
 
 ---
 
@@ -228,9 +321,28 @@ curl -x http://127.0.0.1:7890 https://www.google.com
 
 欢迎提交 Issue 和 Pull Request！
 
+### 添加新平台
+
+1. 在 `HotRanksAggregator` 类中添加新方法：
+```python
+def get_new_platform(self):
+    """获取新平台热榜"""
+    print("\n### 新平台热榜")
+    print("网站：https://example.com\n")
+    # 实现获取逻辑
+```
+
+2. 在 `__init__` 的 `self.sources` 中添加平台信息
+
+3. 在 `main()` 函数中添加命令行支持
+
+4. 更新本文档
+
+### 提交流程
+
 1. Fork 本项目
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+3. 提交更改 (`git commit -m 'feat: add AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启 Pull Request
 
@@ -245,9 +357,23 @@ curl -x http://127.0.0.1:7890 https://www.google.com
 ## 🙏 致谢
 
 - [微博 MCP](https://github.com/modelcontextprotocol/servers) - 微博数据源
+- [抖音 MCP](https://github.com/modelcontextprotocol/servers) - 抖音数据源
 - [Jina AI](https://jina.ai/) - 网页读取服务
 - [mcporter](https://github.com/modelcontextprotocol/mcporter) - MCP 运行时
 
 ---
 
-**Made with ❤️ by lucianaib0318**
+## 📮 联系方式
+
+- **GitHub**: [@lucianaib0318](https://github.com/lucianaib0318)
+- **Issues**: [问题反馈](https://github.com/lucianaib0318/china-hot-ranks/issues)
+
+---
+
+<div align="center">
+
+**如果这个项目对你有帮助，请给个 ⭐️ Star 支持一下！**
+
+Made with ❤️ by lucianaib0318
+
+</div>

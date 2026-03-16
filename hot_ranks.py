@@ -32,45 +32,62 @@ class HotRanksAggregator:
         }
     
     def get_weibo(self):
-        """获取微博热搜（使用微博 MCP）"""
+        """获取微博热搜（微博 MCP + Jina Reader 备用方案）"""
         print("\n### 微博热搜")
         print("网站：https://s.weibo.com/top/sum\n")
         
+        # 方案 1：使用微博 MCP
         try:
-            # 使用 mcporter 调用微博 MCP API
             result = subprocess.run(
                 ['mcporter', 'call', 'weibo.get_trendings(limit: 15)'],
                 capture_output=True, text=True, timeout=60
             )
             
-            if result.returncode != 0:
-                if result.stderr:
-                    print(f"⚠️  mcporter 错误：{result.stderr.strip()[:200]}")
-                print("💡 提示：请确保微博 MCP 服务器已启动")
-                return
+            if result.returncode == 0 and result.stdout.strip():
+                data = json.loads(result.stdout)
+                if isinstance(data, list) and len(data) > 0:
+                    for i, item in enumerate(data[:10], 1):
+                        title = item.get('description', '无标题')
+                        url = item.get('url', '')
+                        trending = item.get('trending', 0)
+                        hot_tag = f" 🔥{trending//10000}万" if trending > 0 else ""
+                        print(f"{i}. {title}{hot_tag}")
+                        print(f"   {url}\n")
+                    return
+        except Exception:
+            pass
+        
+        # 方案 2：使用 Jina Reader 读取微博热搜页面
+        print("⚠️  微博 MCP 不可用，使用备用方案...\n")
+        
+        try:
+            result = subprocess.run(
+                ['curl', '-s', '-A', 'Mozilla/5.0', 'https://r.jina.ai/http://s.weibo.com/top/sum'],
+                capture_output=True, text=True, timeout=45
+            )
             
-            # 解析 JSON
-            data = json.loads(result.stdout)
+            lines = result.stdout.split('\n')
+            rank = 1
+            for line in lines:
+                # 匹配格式：数字。话题 🔥热度
+                line = line.strip()
+                if len(line) > 5 and not line.startswith('http') and not line.startswith('Image'):
+                    # 清理无用前缀
+                    if line.startswith('['):
+                        line = line.split('](')[-1].split(')')[0] if '](' in line else line
+                    if line and len(line) > 3:
+                        print(f"{rank}. {line}")
+                        rank += 1
+                        if rank > 11:
+                            break
             
-            if not isinstance(data, list) or len(data) == 0:
-                print("⚠️  微博热搜数据为空")
-                return
-            
-            for i, item in enumerate(data[:10], 1):
-                title = item.get('description', '无标题')
-                url = item.get('url', '')
-                trending = item.get('trending', 0)
-                hot_tag = f" 🔥{trending//10000}万" if trending > 0 else ""
-                print(f"{i}. {title}{hot_tag}")
-                print(f"   {url}\n")
-                
+            if rank <= 2:
+                print("⚠️  备用方案也未获取到有效数据")
+                        
         except subprocess.TimeoutExpired:
-            print("❌ 微博热搜获取超时（60 秒）")
-        except json.JSONDecodeError as e:
-            print(f"❌ JSON 解析失败：{e}")
-            print(f"   原始输出：{result.stdout[:200]}")
+            print("❌ 微博热搜获取超时（45 秒）")
         except Exception as e:
-            print(f"❌ 微博热搜获取失败：{e}")
+            print(f"❌ 备用方案失败：{e}")
     
     def get_bilibili(self):
         """获取 B 站热门（优化解析逻辑）"""
@@ -288,43 +305,67 @@ class HotRanksAggregator:
         return ''
     
     def get_zhihu(self):
-        """获取知乎热榜"""
+        """获取知乎热榜（Jina Reader + 备用方案）"""
+        print("\n### 知乎热榜")
+        print("网站：https://www.zhihu.com/hot\n")
+        
         try:
             result = subprocess.run(
-                ['curl', '-s', 'https://r.jina.ai/http://www.zhihu.com/hot'],
+                ['curl', '-s', '-A', 'Mozilla/5.0', 'https://r.jina.ai/http://www.zhihu.com/hot'],
+                capture_output=True, text=True, timeout=45
+            )
+            
+            if result.stdout.strip() and '热榜' in result.stdout:
+                lines = result.stdout.split('\n')
+                rank = 1
+                for line in lines:
+                    line = line.strip()
+                    # 匹配知乎热榜条目
+                    if line and len(line) > 5 and not line.startswith('http') and not line.startswith('Image'):
+                        if line.startswith('['):
+                            # 提取标题
+                            title_end = line.find('](')
+                            if title_end > 0:
+                                line = line[1:title_end]
+                        if line and len(line) > 3:
+                            print(f"{rank}. {line}")
+                            rank += 1
+                            if rank > 11:
+                                break
+                if rank > 2:
+                    return
+        except Exception:
+            pass
+        
+        # 备用方案：显示提示
+        print("⚠️  知乎热榜暂时无法获取，可能是被限流")
+        print("💡 建议直接访问：https://www.zhihu.com/hot\n")
+    
+    def get_douyin(self):
+        """获取抖音热榜（备用方案）"""
+        print("\n### 抖音热榜")
+        print("网站：https://www.douyin.com/hot\n")
+        
+        try:
+            # 尝试使用抖音 MCP（如果可用）
+            result = subprocess.run(
+                ['mcporter', 'call', 'douyin.get_trendings(limit: 10)'],
                 capture_output=True, text=True, timeout=30
             )
             
-            print("\n### 知乎热榜")
-            print("网站：https://www.zhihu.com/hot\n")
-            
-            # 由于知乎被 Jina 限流，使用 Tavily 搜索
-            print("注：知乎热榜通过 Tavily 搜索获取\n")
-            print("1. 沪深两市成交额突破 1 万亿元")
-            print("2. 湖人击败森林狼")
-            print("3. 杨瀚森出战 G 联赛")
-            print("4. 陈垣宇 vs 雨果")
-            print("5. 速览中东危局 40 小时")
-            print("6. Macbook Neo 发布")
-            print("7. 苹果春季新品上手评测\n")
-                        
-        except Exception as e:
-            print(f"❌ 知乎热榜获取失败：{e}")
-    
-    def get_douyin(self):
-        """获取抖音热榜"""
-        try:
-            print("\n### 抖音热榜")
-            print("网站：https://www.douyin.com/hot\n")
-            
-            # 抖音热榜通过 Tavily 搜索获取
-            print("注：抖音热榜通过 Tavily 搜索获取\n")
-            print("1. 抓住很多虫子挠脚心")
-            print("2. 短剧王楠的白头发")
-            print("3. 暗河传#藏海传#凡人修仙传海报\n")
-                        
-        except Exception as e:
-            print(f"❌ 抖音热榜获取失败：{e}")
+            if result.returncode == 0 and result.stdout.strip():
+                data = json.loads(result.stdout)
+                if isinstance(data, list) and len(data) > 0:
+                    for i, item in enumerate(data[:10], 1):
+                        title = item.get('title', item.get('description', '无标题'))
+                        print(f"{i}. {title}")
+                    return
+        except Exception:
+            pass
+        
+        # 备用方案：显示提示
+        print("⚠️  抖音热榜需要抖音 MCP 服务器")
+        print("💡 建议直接访问：https://www.douyin.com/hot\n")
     
     def get_all(self):
         """获取所有热榜"""
