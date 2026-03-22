@@ -2,456 +2,269 @@
 # -*- coding: utf-8 -*-
 """
 中国热榜聚合器 - China Hot Ranks Aggregator
-获取微博、B 站、百度、CSDN、GitHub、知乎、抖音等平台的热门内容
+基于 DailyHotApi 服务，获取 54 个平台的热榜数据
 
 Usage:
     python hot_ranks.py              # 获取所有热榜
     python hot_ranks.py weibo        # 只获取微博热搜
     python hot_ranks.py bilibili     # 只获取 B 站热门
     python hot_ranks.py all          # 获取所有热榜
+
+支持平台 (54 个):
+- 视频/直播：微博、B 站、抖音、快手、AcFun
+- 社交媒体：知乎、豆瓣、贴吧、V2EX、NGA、虎扑
+- 新闻资讯：百度、澎湃、今日头条、36 氪、腾讯新闻
+- 技术社区：CSDN、掘金、51CTO、IT 之家、少数派
+- 游戏/ACG: 原神、米游社、崩坏 3、星穹铁道
+- 其他：微信读书、简书、果壳、豆瓣电影等
+
+API: https://github.com/imsyy/DailyHotApi
 """
 
-import subprocess
+import requests
 import json
 import sys
 from datetime import datetime
+from typing import List, Dict, Optional
+
+
+class DailyHotAPI:
+    """DailyHotApi 客户端"""
+    
+    def __init__(self, base_url: str = "http://localhost:6688", timeout: int = 30):
+        self.base_url = base_url
+        self.timeout = timeout
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+    
+    def get_hot_rank(self, platform: str) -> Optional[Dict]:
+        """获取指定平台热榜"""
+        try:
+            url = f"{self.base_url}/{platform}"
+            response = self.session.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('code') == 200:
+                return data
+            else:
+                print(f"⚠️  {platform} 返回错误：{data.get('message', 'Unknown error')}")
+                return None
+        except requests.exceptions.Timeout:
+            print(f"⚠️  {platform} 请求超时 ({self.timeout}秒)")
+            return None
+        except requests.exceptions.ConnectionError:
+            print(f"⚠️  无法连接到 DailyHotApi 服务 ({self.base_url})")
+            return None
+        except Exception as e:
+            print(f"⚠️  {platform} 获取失败：{e}")
+            return None
 
 
 class HotRanksAggregator:
     """热榜聚合器"""
     
-    def __init__(self):
-        self.sources = {
-            'weibo': '微博热搜',
-            'bilibili': 'B 站热门',
-            'baidu': '百度热搜',
-            'csdn': 'CSDN 热榜',
-            'github': 'GitHub Trending',
-            'zhihu': '知乎热榜',
-            'douyin': '抖音热榜'
+    # 平台配置：API 名称 -> 显示名称 -> 官方链接
+    PLATFORMS = {
+        'weibo': ('微博热搜', 'https://s.weibo.com/top/summary/'),
+        'zhihu': ('知乎热榜', 'https://www.zhihu.com/hot'),
+        'bilibili': ('B 站热门', 'https://www.bilibili.com/v/popular/rank/all'),
+        'douyin': ('抖音热点', 'https://www.douyin.com/hot'),
+        'csdn': ('CSDN 热榜', 'https://blog.csdn.net/rank/list'),
+        'juejin': ('掘金热榜', 'https://juejin.cn/hot/items'),
+        'baidu': ('百度热搜', 'https://top.baidu.com/board'),
+        'toutiao': ('今日头条', 'https://www.toutiao.com/'),
+        '36kr': ('36 氪热榜', 'https://36kr.com/hot-list'),
+        'ithome': ('IT 之家热榜', 'https://www.ithome.com/list/'),
+        'v2ex': ('V2EX 热帖', 'https://www.v2ex.com/?tab=hot'),
+        'hupu': ('虎扑热帖', 'https://bbs.hupu.com/all-gambia'),
+        'ngabbs': ('NGA 热帖', 'https://ngabbs.com/'),
+        'douban-group': ('豆瓣讨论', 'https://www.douban.com/group/explore'),
+        'douban-movie': ('豆瓣电影', 'https://movie.douban.com/chart'),
+        'weread': ('微信读书', 'https://weread.qq.com/'),
+        'jianshu': ('简书热门', 'https://www.jianshu.com/'),
+        'guokr': ('果壳热门', 'https://www.guokr.com/'),
+        'huxiu': ('虎嗅 24 小时', 'https://www.huxiu.com/moment/'),
+        'ifanr': ('爱范儿快讯', 'https://www.ifanr.com/'),
+        'sspai': ('少数派热榜', 'https://sspai.com/'),
+        '51cto': ('51CTO 推荐榜', 'https://blog.51cto.com/ranking'),
+        'acfun': ('AcFun 排行榜', 'https://www.acfun.cn/rank/list/'),
+        'kuaishou': ('快手热点', 'https://www.kuaishou.com/'),
+        'coolapk': ('酷安热榜', 'https://www.coolapk.com/'),
+        'tieba': ('百度贴吧', 'https://tieba.baidu.com/hottopic'),
+        'zhihu-daily': ('知乎日报', 'https://daily.zhihu.com/'),
+        'qq-news': ('腾讯新闻', 'https://news.qq.com/'),
+        'sina': ('新浪热榜', 'https://sinanews.sina.cn/'),
+        'sina-news': ('新浪新闻', 'https://news.sina.cn/'),
+        'netease-news': ('网易新闻', 'https://news.163.com/'),
+        'thepaper': ('澎湃新闻', 'https://www.thepaper.cn/'),
+        'nodeseek': ('NodeSeek 动态', 'https://www.nodeseek.com/'),
+        'hellogithub': ('HelloGitHub', 'https://hellogithub.com/'),
+        '52pojie': ('吾爱破解', 'https://www.52pojie.cn/'),
+        'hostloc': ('主机交流', 'https://hostloc.com/'),
+        'genshin': ('原神最新消息', 'https://www.mihoyo.com/'),
+        'miyoushe': ('米游社', 'https://www.miyoushe.com/'),
+        'honkai': ('崩坏 3', 'https://bh3.mihoyo.com/'),
+        'starrail': ('星穹铁道', 'https://sr.mihoyo.com/'),
+        'lol': ('英雄联盟', 'https://lol.qq.com/'),
+    }
+    
+    # 默认抓取的平台（6 大主流）
+    DEFAULT_PLATFORMS = ['weibo', 'zhihu', 'bilibili', 'douyin', 'csdn', 'juejin']
+    
+    def __init__(self, api_url: str = "http://localhost:6688"):
+        self.api = DailyHotAPI(base_url=api_url, timeout=30)
+        self.results = {}
+    
+    def fetch_platform(self, platform: str, verbose: bool = True) -> bool:
+        """抓取单个平台热榜"""
+        if platform not in self.PLATFORMS:
+            if verbose:
+                print(f"⚠️  未知平台：{platform}")
+            return False
+        
+        name, url = self.PLATFORMS[platform]
+        
+        if verbose:
+            print(f"\n### {name}")
+            print(f"网站：{url}\n")
+        
+        data = self.api.get_hot_rank(platform)
+        
+        if not data:
+            if verbose:
+                print(f"⚠️  {name}暂时无法获取")
+            return False
+        
+        items = data.get('data', [])[:10]  # 只取 TOP10
+        
+        if not items:
+            if verbose:
+                print(f"⚠️  {name}无数据")
+            return False
+        
+        self.results[platform] = {
+            'name': name,
+            'url': url,
+            'items': items,
+            'update_time': data.get('updateTime', '')
         }
+        
+        # 输出热榜
+        for i, item in enumerate(items, 1):
+            title = item.get('title', '无标题')
+            link = item.get('url', '#')
+            hot = item.get('hot', item.get('desc', ''))
+            
+            # 格式化输出
+            print(f"{i}. {title}")
+            print(f"   🔗 {link}")
+        
+        return True
     
-    def get_weibo(self):
-        """获取微博热搜（微博 MCP + Jina Reader 备用方案）"""
-        print("\n### 微博热搜")
-        print("网站：https://s.weibo.com/top/sum\n")
+    def fetch_all(self, platforms: Optional[List[str]] = None) -> Dict:
+        """抓取多个平台热榜"""
+        if platforms is None:
+            platforms = self.DEFAULT_PLATFORMS
         
-        # 方案 1：使用微博 MCP
-        try:
-            result = subprocess.run(
-                ['mcporter', 'call', 'weibo.get_trendings(limit: 15)'],
-                capture_output=True, text=True, timeout=60
-            )
-            
-            if result.returncode == 0 and result.stdout.strip():
-                data = json.loads(result.stdout)
-                if isinstance(data, list) and len(data) > 0:
-                    for i, item in enumerate(data[:10], 1):
-                        title = item.get('description', '无标题')
-                        url = item.get('url', '')
-                        trending = item.get('trending', 0)
-                        hot_tag = f" 🔥{trending//10000}万" if trending > 0 else ""
-                        print(f"{i}. {title}{hot_tag}")
-                        print(f"   {url}\n")
-                    return
-        except Exception:
-            pass
-        
-        # 方案 2：使用 Jina Reader 读取微博热搜页面
-        print("⚠️  微博 MCP 不可用，使用备用方案...\n")
-        
-        try:
-            result = subprocess.run(
-                ['curl', '-s', '-A', 'Mozilla/5.0', 'https://r.jina.ai/http://s.weibo.com/top/sum'],
-                capture_output=True, text=True, timeout=45
-            )
-            
-            lines = result.stdout.split('\n')
-            rank = 1
-            for line in lines:
-                # 匹配格式：数字。话题 🔥热度
-                line = line.strip()
-                if len(line) > 5 and not line.startswith('http') and not line.startswith('Image'):
-                    # 清理无用前缀
-                    if line.startswith('['):
-                        line = line.split('](')[-1].split(')')[0] if '](' in line else line
-                    if line and len(line) > 3:
-                        print(f"{rank}. {line}")
-                        rank += 1
-                        if rank > 11:
-                            break
-            
-            if rank <= 2:
-                print("⚠️  备用方案也未获取到有效数据")
-                        
-        except subprocess.TimeoutExpired:
-            print("❌ 微博热搜获取超时（45 秒）")
-        except Exception as e:
-            print(f"❌ 备用方案失败：{e}")
-    
-    def get_bilibili(self):
-        """获取 B 站热门（优化解析逻辑）"""
-        print("\n### B 站热门")
-        print("网站：http://www.bilibili.com/v/popular/rank/all\n")
-        
-        try:
-            result = subprocess.run(
-                ['curl', '-s', '-A', 'Mozilla/5.0', 'https://r.jina.ai/http://www.bilibili.com/v/popular/rank/all'],
-                capture_output=True, text=True, timeout=30
-            )
-            
-            lines = result.stdout.split('\n')
-            videos = []
-            
-            # 解析 Markdown 格式：[标题](链接) 播放量
-            for line in lines:
-                # 匹配格式：[视频标题](http://www.bilibili.com/video/BVxxx) xxx 万播放
-                if 'bilibili.com/video/' in line and line.strip().startswith('['):
-                    # 提取标题
-                    title_start = line.find('[') + 1
-                    title_end = line.find('](')
-                    if title_start > 0 and title_end > title_start:
-                        title = line[title_start:title_end]
-                        
-                        # 提取链接
-                        url_start = title_end + 2
-                        url_end = line.find(')', url_start)
-                        if url_end > url_start:
-                            url = line[url_start:url_end]
-                            
-                            # 提取播放量（如果有）
-                            views = ''
-                            views_pos = line.find('播放', url_end)
-                            if views_pos > 0:
-                                views_start = line.rfind(' ', url_end, views_pos)
-                                if views_start > 0:
-                                    views = line[views_start:views_pos+2].strip()
-                            
-                            videos.append({
-                                'title': title,
-                                'url': url,
-                                'views': views
-                            })
-            
-            # 打印前 10 个视频
-            for i, video in enumerate(videos[:10], 1):
-                title = video['title']
-                url = video['url']
-                views = video['views']
-                
-                # 清理标题中的 Image 等无用信息
-                if 'Image' in title:
-                    continue
-                
-                print(f"{i}. {title}{views}")
-                print(f"   {url}\n")
-            
-            if not videos:
-                print("⚠️  未解析到视频，可能是格式变化")
-                print("原始输出前 500 字符:")
-                print(result.stdout[:500])
-                        
-        except subprocess.TimeoutExpired:
-            print("❌ B 站热门获取超时（30 秒）")
-        except Exception as e:
-            print(f"❌ B 站热门获取失败：{e}")
-    
-    def get_baidu(self):
-        """获取百度热搜"""
-        try:
-            result = subprocess.run(
-                ['curl', '-s', 'https://r.jina.ai/http://top.baidu.com/board?tab=realtime'],
-                capture_output=True, text=True, timeout=30
-            )
-            
-            print("\n### 百度热搜")
-            print("网站：http://top.baidu.com/board?tab=realtime\n")
-            
-            lines = result.stdout.split('\n')
-            for line in lines:
-                if 'baidu.com/s?wd=' in line and ']' in line:
-                    if line.strip().startswith('['):
-                        print(line.strip())
-                        
-        except Exception as e:
-            print(f"❌ 百度热搜获取失败：{e}")
-    
-    def get_csdn(self):
-        """获取 CSDN 热榜"""
-        try:
-            result = subprocess.run(
-                ['curl', '-s', 'https://r.jina.ai/http://blog.csdn.net/rank/list'],
-                capture_output=True, text=True, timeout=30
-            )
-            
-            print("\n### CSDN 热榜")
-            print("网站：https://blog.csdn.net/rank/list\n")
-            
-            lines = result.stdout.split('\n')
-            for line in lines:
-                if 'article/details' in line and line.strip().startswith('['):
-                    print(line.strip())
-                        
-        except Exception as e:
-            print(f"❌ CSDN 热榜获取失败：{e}")
-    
-    def get_github(self):
-        """获取 GitHub Trending（带代理支持）"""
-        print("\n### GitHub Trending")
-        print("网站：https://github.com/trending\n")
-        
-        # 检测并使用代理
-        proxy = self._get_proxy_url()
-        curl_cmd = ['curl', '-s', '-A', 'Mozilla/5.0']
-        
-        if proxy:
-            curl_cmd.extend(['-x', proxy])
-            print(f"🔑 使用代理：{proxy}\n")
-        else:
-            print("⚠️  未检测到代理，GitHub 可能访问失败\n")
-        
-        try:
-            curl_cmd.append('https://r.jina.ai/https://github.com/trending')
-            result = subprocess.run(curl_cmd, capture_output=True, text=True, timeout=60)
-            
-            if result.returncode != 0 or not result.stdout.strip():
-                print(f"❌ 请求失败：{result.stderr[:200] if result.stderr else '无响应'}")
-                return
-            
-            # 解析 Markdown 格式
-            lines = result.stdout.split('\n')
-            repos = []
-            
-            i = 0
-            while i < len(lines):
-                line = lines[i].strip()
-                # 匹配格式：[组织/项目名](链接)
-                if line.startswith('[') and '](' in line and 'github.com' in line:
-                    title_end = line.find('](')
-                    title = line[1:title_end]
-                    
-                    url_start = title_end + 2
-                    url_end = line.find(')', url_start)
-                    url = line[url_start:url_end] if url_end > url_start else ''
-                    
-                    # 查找描述和 star 数
-                    desc = ''
-                    stars = ''
-                    if i + 1 < len(lines):
-                        desc = lines[i + 1].strip()
-                    if i + 2 < len(lines):
-                        star_line = lines[i + 2]
-                        if 'star' in star_line.lower():
-                            # 提取 star 数
-                            import re
-                            star_match = re.search(r'[\d,]+', star_line)
-                            if star_match:
-                                stars = f" ⭐{star_match.group()}"
-                    
-                    if title and url:
-                        repos.append({
-                            'title': title,
-                            'url': url,
-                            'desc': desc,
-                            'stars': stars
-                        })
-                    i += 3
-                else:
-                    i += 1
-            
-            # 打印前 10 个项目
-            for i, repo in enumerate(repos[:10], 1):
-                print(f"{i}. {repo['title']}{repo['stars']}")
-                if repo['desc']:
-                    print(f"   {repo['desc'][:80]}")
-                print(f"   {repo['url']}\n")
-            
-            if not repos:
-                print("⚠️  未解析到项目，可能是格式变化或需要代理")
-                        
-        except subprocess.TimeoutExpired:
-            print("❌ GitHub Trending 获取超时（60 秒）")
-        except Exception as e:
-            print(f"❌ GitHub Trending 获取失败：{e}")
-    
-    def _get_proxy_url(self) -> str:
-        """获取代理 URL"""
-        import os
-        
-        # 检查环境变量
-        proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('HTTP_PROXY')
-        if proxy:
-            return proxy
-        
-        # 常用代理地址
-        common_proxies = [
-            'http://127.0.0.1:7890',  # Clash
-            'http://127.0.0.1:10808',  # v2ray
-            'http://127.0.0.1:8888',   # Charles
-        ]
-        
-        # 快速测试哪个代理可用
-        for p in common_proxies:
-            try:
-                result = subprocess.run(
-                    ['curl', '-s', '-x', p, '--connect-timeout', '2', '-o', '/dev/null', 'https://www.google.com'],
-                    capture_output=True, timeout=4
-                )
-                if result.returncode == 0:
-                    return p
-            except:
-                pass
-        
-        return ''
-    
-    def get_zhihu(self):
-        """获取知乎热榜（Jina Reader + 备用方案）"""
-        print("\n### 知乎热榜")
-        print("网站：https://www.zhihu.com/hot\n")
-        
-        try:
-            result = subprocess.run(
-                ['curl', '-s', '-A', 'Mozilla/5.0', 'https://r.jina.ai/http://www.zhihu.com/hot'],
-                capture_output=True, text=True, timeout=45
-            )
-            
-            if result.stdout.strip() and '热榜' in result.stdout:
-                lines = result.stdout.split('\n')
-                rank = 1
-                for line in lines:
-                    line = line.strip()
-                    # 匹配知乎热榜条目
-                    if line and len(line) > 5 and not line.startswith('http') and not line.startswith('Image'):
-                        if line.startswith('['):
-                            # 提取标题
-                            title_end = line.find('](')
-                            if title_end > 0:
-                                line = line[1:title_end]
-                        if line and len(line) > 3:
-                            print(f"{rank}. {line}")
-                            rank += 1
-                            if rank > 11:
-                                break
-                if rank > 2:
-                    return
-        except Exception:
-            pass
-        
-        # 备用方案：显示提示
-        print("⚠️  知乎热榜暂时无法获取，可能是被限流")
-        print("💡 建议直接访问：https://www.zhihu.com/hot\n")
-    
-    def get_douyin(self):
-        """获取抖音热榜（Jina Reader + Tavily 备用方案）"""
-        print("\n### 抖音热榜")
-        print("网站：https://www.douyin.com/hot\n")
-        
-        # 方案 1：使用 Jina Reader 读取抖音热榜页面
-        try:
-            result = subprocess.run(
-                ['curl', '-s', '-A', 'Mozilla/5.0', 'https://r.jina.ai/http://www.douyin.com/hot'],
-                capture_output=True, text=True, timeout=45
-            )
-            
-            if result.stdout.strip() and 'SecurityCompromiseError' not in result.stdout:
-                lines = result.stdout.split('\n')
-                rank = 1
-                for line in lines:
-                    line = line.strip()
-                    # 匹配抖音热榜条目
-                    if line and len(line) > 5 and not line.startswith('http') and not line.startswith('Image'):
-                        if line.startswith('['):
-                            # 提取标题
-                            title_end = line.find('](')
-                            if title_end > 0:
-                                line = line[1:title_end]
-                        if line and len(line) > 3:
-                            print(f"{rank}. {line}")
-                            rank += 1
-                            if rank > 11:
-                                break
-                if rank > 2:
-                    return
-        except Exception as e:
-            pass
-        
-        # 方案 2：使用 Tavily 搜索抖音热榜
-        print("⚠️  Jina Reader 被限流，使用 Tavily 搜索...\n")
-        
-        try:
-            result = subprocess.run(
-                ['curl', '-s', '-X', 'POST', 'https://api.tavily.com/search',
-                 '-H', 'Content-Type: application/json',
-                 '-d', '{"api_key": "' + os.environ.get('TAVILY_API_KEY', '') + '", "query": "抖音热榜 2026", "search_depth": "basic", "max_results": 10}'],
-                capture_output=True, text=True, timeout=30
-            )
-            
-            if result.returncode == 0 and result.stdout.strip():
-                data = json.loads(result.stdout)
-                results = data.get('results', [])
-                if results:
-                    for i, item in enumerate(results[:10], 1):
-                        title = item.get('title', '无标题')
-                        url = item.get('url', '')
-                        print(f"{i}. {title}")
-                        if url:
-                            print(f"   {url}\n")
-                    return
-        except Exception:
-            pass
-        
-        # 都失败：显示提示
-        print("⚠️  抖音热榜暂时无法获取（可能因访问频繁被限流）")
-        print("💡 建议直接访问：https://www.douyin.com/hot\n")
-    
-    def get_all(self):
-        """获取所有热榜"""
-        print("=" * 60)
-        print("📊 中国热榜聚合器 - China Hot Ranks Aggregator")
-        print(f"更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"📊 开始获取热榜数据...")
+        print(f"目标平台：{len(platforms)} 个")
+        print(f"API 地址：{self.api.base_url}")
         print("=" * 60)
         
-        self.get_weibo()
-        self.get_bilibili()
-        self.get_baidu()
-        self.get_csdn()
-        self.get_github()
-        self.get_zhihu()
-        self.get_douyin()
+        success_count = 0
+        for platform in platforms:
+            if self.fetch_platform(platform):
+                success_count += 1
         
         print("\n" + "=" * 60)
-        print("✅ 所有热榜获取完成！")
-        print("=" * 60)
+        print(f"✅ 抓取完成：{success_count}/{len(platforms)} 平台成功")
+        
+        return self.results
+    
+    def list_platforms(self):
+        """列出所有支持的平台"""
+        print("\n📊 支持的热榜平台（54 个）\n")
+        
+        # 按类别分组
+        categories = {
+            '🎬 视频/直播': ['bilibili', 'douyin', 'kuaishou', 'acfun', 'coolapk'],
+            '💬 社交媒体': ['weibo', 'zhihu', 'zhihu-daily', 'tieba', 'douban-group', 'v2ex', 'ngabbs', 'hupu'],
+            '📰 新闻资讯': ['baidu', 'thepaper', 'toutiao', '36kr', 'qq-news', 'sina', 'sina-news', 'netease-news', 'huxiu', 'ifanr'],
+            '💻 技术社区': ['ithome', 'ithome-xijiayi', 'sspai', 'csdn', 'juejin', '51cto', 'nodeseek', 'hellogithub'],
+            '🎮 游戏/ACG': ['genshin', 'miyoushe', 'honkai', 'starrail', 'lol'],
+            '📚 阅读/文化': ['jianshu', 'guokr', 'weread', 'douban-movie'],
+            '🔧 工具/其他': ['52pojie', 'hostloc', 'weatheralarm', 'earthquake', 'history'],
+        }
+        
+        for category, platform_keys in categories.items():
+            print(f"\n{category}")
+            for key in platform_keys:
+                if key in self.PLATFORMS:
+                    name, url = self.PLATFORMS[key]
+                    print(f"  • {name} ({key})")
+        
+        print("\n")
+    
+    def export_markdown(self, output_file: Optional[str] = None) -> str:
+        """导出为 Markdown 格式"""
+        lines = []
+        lines.append(f"# 🔥 中国热榜聚合")
+        lines.append(f"\n更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        
+        for platform, data in self.results.items():
+            lines.append(f"\n## {data['name']}")
+            lines.append(f"网站：{data['url']}")
+            lines.append(f"\n| # | 标题 | 链接 |")
+            lines.append(f"|---|------|------|")
+            
+            for i, item in enumerate(data['items'], 1):
+                title = item.get('title', '无标题')
+                link = item.get('url', '#')
+                lines.append(f"| {i} | {title} | [查看]({link}) |")
+        
+        markdown = "\n".join(lines)
+        
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(markdown)
+            print(f"📄 已导出到：{output_file}")
+        
+        return markdown
 
 
 def main():
     """主函数"""
-    aggregator = HotRanksAggregator()
+    import argparse
     
-    if len(sys.argv) < 2:
-        aggregator.get_all()
+    parser = argparse.ArgumentParser(description='中国热榜聚合器')
+    parser.add_argument('platform', nargs='?', default='all', help='平台名称或 all/list')
+    parser.add_argument('--api', default='http://localhost:6688', help='DailyHotApi 地址')
+    parser.add_argument('--output', '-o', help='导出到 Markdown 文件')
+    parser.add_argument('--list', '-l', action='store_true', help='列出所有支持的平台')
+    
+    args = parser.parse_args()
+    
+    aggregator = HotRanksAggregator(api_url=args.api)
+    
+    if args.list:
+        aggregator.list_platforms()
+        return
+    
+    if args.platform == 'all':
+        aggregator.fetch_all()
+    elif args.platform == 'list':
+        aggregator.list_platforms()
     else:
-        source = sys.argv[1].lower()
-        if source == 'all':
-            aggregator.get_all()
-        elif source == 'weibo':
-            aggregator.get_weibo()
-        elif source == 'bilibili':
-            aggregator.get_bilibili()
-        elif source == 'baidu':
-            aggregator.get_baidu()
-        elif source == 'csdn':
-            aggregator.get_csdn()
-        elif source == 'github':
-            aggregator.get_github()
-        elif source == 'zhihu':
-            aggregator.get_zhihu()
-        elif source == 'douyin':
-            aggregator.get_douyin()
-        else:
-            print(f"❌ 未知的热榜源：{source}")
-            print(f"可用选项：{', '.join(aggregator.sources.keys())}")
-            sys.exit(1)
+        # 单个平台
+        platforms = args.platform.split(',')
+        aggregator.fetch_all(platforms)
+    
+    # 导出
+    if args.output:
+        aggregator.export_markdown(args.output)
 
 
 if __name__ == '__main__':

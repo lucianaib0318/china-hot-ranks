@@ -1,2 +1,1 @@
-# No Python dependencies required!
-# Uses system tools: curl, mcporter
+requests>=2.28.0
