@@ -66,7 +66,7 @@ class DailyHotAPI:
 class HotRanksAggregator:
     """热榜聚合器"""
     
-    # 平台配置：API 名称 -> 显示名称 -> 官方链接
+    # 平台配置：API 名称 -> 显示名称 -> 官方链接 (35 个稳定平台)
     PLATFORMS = {
         'weibo': ('微博热搜', 'https://s.weibo.com/top/summary/'),
         'zhihu': ('知乎热榜', 'https://www.zhihu.com/hot'),
@@ -78,7 +78,6 @@ class HotRanksAggregator:
         'toutiao': ('今日头条', 'https://www.toutiao.com/'),
         '36kr': ('36 氪热榜', 'https://36kr.com/hot-list'),
         'ithome': ('IT 之家热榜', 'https://www.ithome.com/list/'),
-        'v2ex': ('V2EX 热帖', 'https://www.v2ex.com/?tab=hot'),
         'hupu': ('虎扑热帖', 'https://bbs.hupu.com/all-gambia'),
         'ngabbs': ('NGA 热帖', 'https://ngabbs.com/'),
         'douban-group': ('豆瓣讨论', 'https://www.douban.com/group/explore'),
@@ -92,7 +91,6 @@ class HotRanksAggregator:
         '51cto': ('51CTO 推荐榜', 'https://blog.51cto.com/ranking'),
         'acfun': ('AcFun 排行榜', 'https://www.acfun.cn/rank/list/'),
         'kuaishou': ('快手热点', 'https://www.kuaishou.com/'),
-        'coolapk': ('酷安热榜', 'https://www.coolapk.com/'),
         'tieba': ('百度贴吧', 'https://tieba.baidu.com/hottopic'),
         'zhihu-daily': ('知乎日报', 'https://daily.zhihu.com/'),
         'qq-news': ('腾讯新闻', 'https://news.qq.com/'),
@@ -100,10 +98,7 @@ class HotRanksAggregator:
         'sina-news': ('新浪新闻', 'https://news.sina.cn/'),
         'netease-news': ('网易新闻', 'https://news.163.com/'),
         'thepaper': ('澎湃新闻', 'https://www.thepaper.cn/'),
-        'nodeseek': ('NodeSeek 动态', 'https://www.nodeseek.com/'),
         'hellogithub': ('HelloGitHub', 'https://hellogithub.com/'),
-        '52pojie': ('吾爱破解', 'https://www.52pojie.cn/'),
-        'hostloc': ('主机交流', 'https://hostloc.com/'),
         'genshin': ('原神最新消息', 'https://www.mihoyo.com/'),
         'miyoushe': ('米游社', 'https://www.miyoushe.com/'),
         'honkai': ('崩坏 3', 'https://bh3.mihoyo.com/'),
@@ -113,6 +108,9 @@ class HotRanksAggregator:
     
     # 默认抓取的平台（6 大主流）
     DEFAULT_PLATFORMS = ['weibo', 'zhihu', 'bilibili', 'douyin', 'csdn', 'juejin']
+    
+    # 全部 35 个平台列表
+    ALL_PLATFORMS = list(PLATFORMS.keys())
     
     def __init__(self, api_url: str = "http://localhost:6688"):
         self.api = DailyHotAPI(base_url=api_url, timeout=30)
@@ -186,17 +184,16 @@ class HotRanksAggregator:
     
     def list_platforms(self):
         """列出所有支持的平台"""
-        print("\n📊 支持的热榜平台（54 个）\n")
+        print("\n📊 支持的热榜平台（35 个）\n")
         
-        # 按类别分组
+        # 按类别分组（仅稳定平台）
         categories = {
-            '🎬 视频/直播': ['bilibili', 'douyin', 'kuaishou', 'acfun', 'coolapk'],
-            '💬 社交媒体': ['weibo', 'zhihu', 'zhihu-daily', 'tieba', 'douban-group', 'v2ex', 'ngabbs', 'hupu'],
+            '🎬 视频/直播': ['bilibili', 'douyin', 'kuaishou', 'acfun'],
+            '💬 社交媒体': ['weibo', 'zhihu', 'zhihu-daily', 'tieba', 'douban-group', 'ngabbs', 'hupu'],
             '📰 新闻资讯': ['baidu', 'thepaper', 'toutiao', '36kr', 'qq-news', 'sina', 'sina-news', 'netease-news', 'huxiu', 'ifanr'],
-            '💻 技术社区': ['ithome', 'ithome-xijiayi', 'sspai', 'csdn', 'juejin', '51cto', 'nodeseek', 'hellogithub'],
+            '💻 技术社区': ['ithome', 'sspai', 'csdn', 'juejin', '51cto', 'hellogithub'],
             '🎮 游戏/ACG': ['genshin', 'miyoushe', 'honkai', 'starrail', 'lol'],
             '📚 阅读/文化': ['jianshu', 'guokr', 'weread', 'douban-movie'],
-            '🔧 工具/其他': ['52pojie', 'hostloc', 'weatheralarm', 'earthquake', 'history'],
         }
         
         for category, platform_keys in categories.items():
@@ -206,7 +203,7 @@ class HotRanksAggregator:
                     name, url = self.PLATFORMS[key]
                     print(f"  • {name} ({key})")
         
-        print("\n")
+        print(f"\n✅ 共 {len(self.PLATFORMS)} 个平台，全部稳定可用\n")
     
     def export_markdown(self, output_file: Optional[str] = None) -> str:
         """导出为 Markdown 格式"""

@@ -1,12 +1,12 @@
 # 🔥 中国热榜聚合器 - China Hot Ranks Aggregator
 
-基于 [DailyHotApi](https://github.com/imsyy/DailyHotApi) 的热榜聚合工具，支持 **54 个平台** 的热榜抓取。
+基于 [DailyHotApi](https://github.com/imsyy/DailyHotApi) 的热榜聚合工具，支持 **35 个平台** 的热榜抓取。
 
 ---
 
 ## 🎯 特性
 
-- ✅ **54 个平台**：微博、知乎、B 站、抖音、CSDN、掘金等
+- ✅ **35 个平台**：微博、知乎、B 站、抖音、CSDN、掘金等
 - ✅ **稳定可靠**：本地服务调用，无网络限流问题
 - ✅ **快速高效**：单次抓取 <10 秒
 - ✅ **易于扩展**：新增平台只需一行配置
@@ -75,28 +75,25 @@ python3 hot_ranks.py --output hot-ranks.md
 | CSDN 热榜 | `csdn` | https://blog.csdn.net/rank/list |
 | 掘金热榜 | `juejin` | https://juejin.cn/hot/items |
 
-### 全部平台（54 个）
+### 全部平台（35 个）
 
-**🎬 视频/直播 (5)**
-- bilibili, douyin, kuaishou, acfun, coolapk
+**🎬 视频/直播 (4)**
+- bilibili, douyin, kuaishou, acfun
 
-**💬 社交媒体 (8)**
-- weibo, zhihu, zhihu-daily, tieba, douban-group, v2ex, ngabbs, hupu
+**💬 社交媒体 (7)**
+- weibo, zhihu, zhihu-daily, tieba, douban-group, hupu, ngabbs
 
 **📰 新闻资讯 (10)**
 - baidu, thepaper, toutiao, 36kr, qq-news, sina, sina-news, netease-news, huxiu, ifanr
 
-**💻 技术社区 (8)**
-- ithome, ithome-xijiayi, sspai, csdn, juejin, 51cto, nodeseek, hellogithub
+**💻 技术社区 (6)**
+- ithome, sspai, csdn, juejin, 51cto, hellogithub
 
 **🎮 游戏/ACG (5)**
 - genshin, miyoushe, honkai, starrail, lol
 
 **📚 阅读/文化 (4)**
 - jianshu, guokr, weread, douban-movie
-
-**🔧 工具/其他 (5)**
-- 52pojie, hostloc, weatheralarm, earthquake, history
 
 ---
 
@@ -172,7 +169,7 @@ python3 hot_ranks.py --api http://host.docker.internal:6688
 ## 🏗️ 架构
 
 ```
-用户请求 → hot_ranks.py → DailyHotApi (localhost:6688) → 54 个热榜源
+用户请求 → hot_ranks.py → DailyHotApi (localhost:6688) → 35 个热榜源
 ```
 
 ### 组件说明
@@ -219,7 +216,7 @@ crontab -e
 ## 📝 更新日志
 
 **v2.0.0** (2026-03-22)
-- ✨ 重构：改用 DailyHotApi 服务，支持 54 个平台
+- ✨ 重构：改用 DailyHotApi 服务，支持 35 个平台
 - ✨ 新增：知乎、B 站、抖音、掘金等平台
 - ✨ 优化：抓取速度从 180 秒降至 10 秒
 - ✨ 修复：网络限流导致的失败问题
@@ -233,7 +230,7 @@ crontab -e
 
 ## 🤝 致谢
 
-- [DailyHotApi](https://github.com/imsyy/DailyHotApi) - 提供 54 个热榜源 API
+- [DailyHotApi](https://github.com/imsyy/DailyHotApi) - 提供热榜源 API
 - [OpenClaw](https://github.com/openclaw/openclaw) - AI 助手平台
 
 ---
