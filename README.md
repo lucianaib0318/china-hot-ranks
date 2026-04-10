@@ -216,6 +216,12 @@ crontab -e
 
 ## 📝 更新日志
 
+**v2.1.0** (2026-04-10)
+- ✨ 新增 setup-service.sh 一键安装/启动 DailyHotApi 服务
+- ✨ 更新 install.sh 适配 DailyHotApi
+- ✨ 优化 Markdown 导出表格样式
+- 📝 完善文档
+
 **v2.0.0** (2026-03-22)
 - ✨ 重构：改用 DailyHotApi 服务，支持 35 个平台
 - ✨ 新增：知乎、B 站、抖音、掘金等平台
